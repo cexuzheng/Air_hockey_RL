@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 print("hello")
 
-game = air_hockey();
+game = air_hockey(goal_fraction = 0.7);
 
 game._draw()
 plt.show()
