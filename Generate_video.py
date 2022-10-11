@@ -20,12 +20,13 @@ game.enemy_hand_contour += game.enemy_hand_pos
 game._draw()
 theta = np.random.rand()*np.pi
 game.set_ball_pos_vel([game.x_width/2, game.y_height/2],  np.random.rand()*6*np.array( np.cos(theta), np.sin(theta) ) )
+game.set_ball_pos_vel([1,1],  [-1,-1] )
 
 lin_ball = game.ax.plot( game.ball_contour[:,0], game.ball_contour[:,1], '--r' )[0]
 lin_self_hand = game.ax.plot( game.self_hand_contour[:,0], game.self_hand_contour[:,1], '--b' )[0]
 lin_enemy_hand = game.ax.plot( game.enemy_hand_contour[:,0], game.enemy_hand_contour[:,1], '--b' )[0]
 
-T = 9; n_loop = int(T/game.dt)
+T = 2; n_loop = int(T/game.dt)
 ball_contour_shape = game.ball_contour.shape
 ball_contours = np.zeros( (n_loop, ball_contour_shape[0], ball_contour_shape[1]) )
 self_hand_contour_shape = game.self_hand_contour.shape
@@ -51,7 +52,7 @@ line_ani = animation.FuncAnimation( game.fig, update_line, n_loop,
      fargs=(lin_ball, ball_contours, lin_self_hand, self_hand_contours, lin_enemy_hand, enemy_hand_contours), interval=150,save_count = 1000)
 
 
-line_ani.save('random.mp4', writer=writer)
+line_ani.save('corner.mp4', writer=writer)
 
 
 plt.show()

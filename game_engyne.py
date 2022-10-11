@@ -128,9 +128,9 @@ class air_hockey:
         sg_lambda = np.ones(n_walls)
         sg_lambda[bool_negative] = -1
         lambdas = sg_lambda*np.linalg.norm( x_collision - trajectory[0,:], axis= 1 ) / np.max( [np.linalg.norm(v1), 1e-16])
-        bool_collision = np.logical_and( lambdas_2 > 1e-10, lambdas_2 < 1.0-1e-10)
-        bool_collision = np.logical_and( bool_collision, lambdas > 1e-10)
-        bool_collision = np.logical_and( bool_collision, lambdas < 1.0-1e-10) 
+        bool_collision = np.logical_and( lambdas_2 > -1e-16, lambdas_2 < 1.0+1e-16)
+        bool_collision = np.logical_and( bool_collision, lambdas > 1e-16)
+        bool_collision = np.logical_and( bool_collision, lambdas < 1.0-1e-16) 
         return ( bool_collision, lambdas )
     
     def check_hand_collision(self, ball_trajectory, hand_trajectory):
@@ -231,7 +231,7 @@ class air_hockey:
 
     def ball_wall_coll(self, prev_ball_pos, new_ball_pos, v_wall, lambda_coll, time_left, v_ball):
         v_ball_after = self.wall_bounce(v_ball, v_wall)*self.bounce_coeff
-        prev_ball_pos = (1-lambda_coll)*prev_ball_pos + lambda_coll*new_ball_pos
+        prev_ball_pos = (1-lambda_coll+1e-10)*prev_ball_pos + (lambda_coll-1e-10)*new_ball_pos
         new_ball_pos = prev_ball_pos + v_ball_after*time_left
         return( prev_ball_pos, new_ball_pos, v_ball_after )
     
