@@ -16,7 +16,8 @@ SELF_HAND_WALL_COLLISION = 6; ENEMY_HAND_WALL_COLLISION = 7
 
 class air_hockey:
     def __init__(self, x_width = 4, y_height = 6, dt = 0.1, ball_radious = 0.1, hand_radious = 0.15,
-            goal_fraction = 0.5, m_ball = 0.1, m_hand = 0.2, drag_coeff = 0.1, bounce_coeff = 0.96):
+            goal_fraction = 0.5, m_ball = 0.1, m_hand = 0.2, hand_fric_coeff = 0.1, ball_fric_coeff = 0.01,
+            bounce_coeff = 0.96):
         self.x_width = x_width;
         self.y_height = y_height;
         self.dt = dt;
@@ -26,6 +27,7 @@ class air_hockey:
         self.ball_pos = np.array(  [ ball_radious + np.random.rand()*( x_width - 2*ball_radious ), 
                     ball_radious + np.random.rand()*( y_height - 2*ball_radious ) ]  );         # [x,y]
         self.ball_contour = ball_radious*np.array( [  np.cos(points), np.sin(points) ] ).T + self.ball_pos
+        self.ball_contour_pos = self.ball_pos
         ball_v_angle = np.random.rand() * 2*np.pi 
         self.ball_vel = np.random.rand()*np.array([ np.cos(ball_v_angle), np.sin(ball_v_angle) ])
 
@@ -33,10 +35,12 @@ class air_hockey:
 
         self.self_hand_pos = np.array(  [ x_width/2, hand_radious + y_height/2*0.3 ]  );         # [x,y]
         self.self_hand_contour = hand_radious*np.array( [  np.cos(points), np.sin(points) ] ).T + self.self_hand_pos
+        self.self_hand_contour_pos = self.self_hand_pos
         self.self_hand_vel = np.zeros(2)
 
         self.enemy_hand_pos = np.array(  [ x_width/2, y_height*0.85 - hand_radious ]  );         # [x,y]
         self.enemy_hand_contour = hand_radious*np.array( [  np.cos(points), np.sin(points) ] ).T + self.enemy_hand_pos
+        self.enemy_hand_contour_pos = self.enemy_hand_pos
         self.enemy_hand_vel = np.zeros(2)
 
         goal_corner = (1-goal_fraction)/2
@@ -47,7 +51,8 @@ class air_hockey:
         self.m_ball = m_ball
         self.m_hand = m_hand
 
-        self.drag_coeff = drag_coeff
+        self.hand_fric_coeff = hand_fric_coeff
+        self.ball_fric_coeff = ball_fric_coeff
         self.bounce_coeff = bounce_coeff
 
         
@@ -74,10 +79,18 @@ class air_hockey:
         hand_limits = hand_limits + [[  [hand_radious, self.y_height-hand_radious], [hand_radious, self.y_height/2+hand_radious]     ]]
         self.enemy_hand_walls_segments = hand_limits
 
+    def update_contours(self):
+        self.ball_contour += self.ball_pos - self.ball_contour_pos
+        self.ball_contour_pos = self.ball_pos
+        self.self_hand_contour += self.self_hand_pos - self.self_hand_contour_pos
+        self.self_hand_contour_pos = self.self_hand_pos
+        self.enemy_hand_contour += self.enemy_hand_pos - self.enemy_hand_contour_pos
+        self.enemy_hand_contour_pos = self.enemy_hand_pos
+
     def set_ball_pos_vel(self, ball_pos, ball_vel):
-        self.ball_contour -= self.ball_pos
         self.ball_pos = np.array(ball_pos); self.ball_vel = np.array(ball_vel)
-        self.ball_contour += self.ball_pos
+        self.ball_contour += self.ball_pos - self.ball_contour_pos
+        self.ball_contour_pos = ball_pos
 
     def _draw(self):
         x_l2r = np.linspace(0, self.x_width, 11);
@@ -234,7 +247,16 @@ class air_hockey:
         prev_ball_pos = (1-lambda_coll+1e-10)*prev_ball_pos + (lambda_coll-1e-10)*new_ball_pos
         new_ball_pos = prev_ball_pos + v_ball_after*time_left
         return( prev_ball_pos, new_ball_pos, v_ball_after )
-    
+
+    def friction_force(self, mass, fr_coeff, v1 ):
+        fr_push = 9.8*mass*fr_coeff
+        v_norm = np.linalg.norm(v1)
+        if( fr_push > v_norm or v_norm < 1e-10):
+            v1 = np.zeros(2)
+        else:
+            v1 = (v_norm-fr_push)*v1/v_norm
+        return(v1)
+  
     def compute_physics(self, update_contour = False):
         prev_ball_pos = self.ball_pos
         new_ball_pos = self.ball_pos + self.ball_vel*self.dt
@@ -253,7 +275,6 @@ class air_hockey:
         while any_coll:
             if( coll_type == SELF_HAND_WALL_COLLISION ):
                 ( self_prev_hand_pos, self_new_hand_pos, self.self_hand_vel) = self.hand_wall_coll(self_prev_hand_pos, self_new_hand_pos, lambda_coll)
-                print("self", self_new_hand_pos)
                 enemy_prev_hand_pos = (1-lambda_coll)*enemy_prev_hand_pos + lambda_coll*enemy_new_hand_pos
                 prev_ball_pos = (1-lambda_coll)*prev_ball_pos + lambda_coll*new_ball_pos
             elif( coll_type == ENEMY_HAND_WALL_COLLISION ):
@@ -290,35 +311,16 @@ class air_hockey:
             # once updated compute again
             (any_coll, coll_type, lambda_coll, wall_i ) = self.check_any_coll([prev_ball_pos, new_ball_pos], 
                 [self_prev_hand_pos, self_new_hand_pos], [enemy_prev_hand_pos, enemy_new_hand_pos])
-            time_left = self.dt*(1-lambda_coll)
-        
-        if(update_contour):
-            self.ball_contour = self.ball_contour-self.ball_pos + new_ball_pos
-            self.self_hand_contour = self.self_hand_contour - self.self_hand_pos + self_new_hand_pos
-            self.enemy_hand_contour = self.enemy_hand_contour - self.enemy_hand_pos + enemy_new_hand_pos
+            time_left = time_left*(1-lambda_coll)
         
         self.ball_pos = new_ball_pos; self.self_hand_pos = self_new_hand_pos; self.enemy_hand_pos = enemy_new_hand_pos
-        ball_drag_push = 9.8*self.m_ball*self.drag_coeff*self.dt
-        if ball_drag_push > np.linalg.norm(self.ball_vel):
-            self.ball_vel = np.zeros(2)
-        else:
-            ball_vel_norm = np.linalg.norm(self.ball_vel)
-            self.ball_vel = (ball_vel_norm - ball_drag_push)*self.ball_vel/np.max([ball_vel_norm , 1e-10])
-
-        hand_drag_push = 9.8*self.m_hand*self.drag_coeff*self.dt
+        if(update_contour):
+            self.update_contours()
         
-        if hand_drag_push > np.linalg.norm(self.self_hand_vel):
-            self.self_hand_vel = np.zeros(2)
-        else:
-            ball_vel_norm = np.linalg.norm(self.self_hand_vel)
-            self.self_hand_vel = (ball_vel_norm - hand_drag_push)*self.self_hand_vel/np.max([ball_vel_norm , 1e-10])
-
-        if hand_drag_push > np.linalg.norm(self.enemy_hand_vel):
-            self.enemy_hand_vel = np.zeros(2)
-        else:
-            ball_vel_norm = np.linalg.norm(self.enemy_hand_vel)
-            self.enemy_hand_vel = (ball_vel_norm - hand_drag_push)*self.enemy_hand_vel/np.max([ball_vel_norm , 1e-10])
-        
+        # drag_physics to velocity
+        self.ball_vel = self.friction_force( self.m_ball, self.ball_fric_coeff, self.ball_vel )
+        self.self_hand_vel = self.friction_force( self.m_hand, self.hand_fric_coeff, self.self_hand_vel )
+        self.enemy_hand_vel = self.friction_force( self.m_hand, self.hand_fric_coeff, self.enemy_hand_vel )
 
     #
     # ball and physics
