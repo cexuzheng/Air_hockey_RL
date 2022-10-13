@@ -211,8 +211,10 @@ class air_hockey:
                 coll_type = ENEMY_HAND_BALL_COLLSION
             elif( which_coll >= 2 and which_coll <= 5 ):
                 coll_type = SELF_HAND_WALL_COLLISION
+                wall_i = int(which_coll - 2)
             elif( which_coll >= 6 and which_coll <= 9 ):
                 coll_type = ENEMY_HAND_WALL_COLLISION
+                wall_i = int(which_coll - 6)
             elif( which_coll == 10 ):
                 coll_type = GOAL_TO_SELF
             elif( which_coll == 11 ):
@@ -223,8 +225,19 @@ class air_hockey:
         else:
             return( False, NONE_COLL, -1, -1)
 
-    def hand_wall_coll(self, prev_hand_pos, new_hand_pos, lambda_coll ):
-        coll_pos = (1-lambda_coll)*prev_hand_pos + lambda_coll*new_hand_pos
+    def check_hand_out(self, coll_pos, walls ):
+        walls = np.array(walls)
+        v1 = walls[:,1,:] - walls[:,0,:]
+        v2 = coll_pos - walls[:,0,:]
+        for i in range( walls.shape[0] ):
+            v_wall2ball = coll_pos - v1[i,:]*np.dot(v2[i,:], v1[i,:])
+            if np.linalg.norm( v_wall2ball ) < 1e-10 :
+                coll_pos += v_wall2ball*1e-9/np.linalg.norm( v_wall2ball )
+        return( coll_pos )
+
+    def hand_wall_coll(self, prev_hand_pos, new_hand_pos, lambda_coll, walls):
+        coll_pos = (1-lambda_coll+1e-10)*prev_hand_pos + (lambda_coll-1e-10)*new_hand_pos
+        coll_pos = self.check_hand_out( coll_pos, walls )
         return( coll_pos, coll_pos, np.zeros(2) )
 
     def hand_ball_coll(self, prev_ball_pos, new_ball_pos, prev_hand_pos, new_hand_pos, lambda_coll, time_left, v_ball, v_hand):
@@ -272,13 +285,15 @@ class air_hockey:
 
         print("coll_type = ", coll_type, "wall_i = ", wall_i)
         time_left = self.dt*(1-lambda_coll)
+        self_goals = 0;
+        enemy_goals = 0;
         while any_coll:
             if( coll_type == SELF_HAND_WALL_COLLISION ):
-                ( self_prev_hand_pos, self_new_hand_pos, self.self_hand_vel) = self.hand_wall_coll(self_prev_hand_pos, self_new_hand_pos, lambda_coll)
+                ( self_prev_hand_pos, self_new_hand_pos, self.self_hand_vel) = self.hand_wall_coll(self_prev_hand_pos, self_new_hand_pos, lambda_coll, self.self_hand_walls_segments)
                 enemy_prev_hand_pos = (1-lambda_coll)*enemy_prev_hand_pos + lambda_coll*enemy_new_hand_pos
                 prev_ball_pos = (1-lambda_coll)*prev_ball_pos + lambda_coll*new_ball_pos
             elif( coll_type == ENEMY_HAND_WALL_COLLISION ):
-                ( enemy_prev_hand_pos, enemy_new_hand_pos, self.enemy_hand_vel) = self.hand_wall_coll(enemy_prev_hand_pos, enemy_new_hand_pos, lambda_coll)
+                ( enemy_prev_hand_pos, enemy_new_hand_pos, self.enemy_hand_vel) = self.hand_wall_coll(enemy_prev_hand_pos, enemy_new_hand_pos, lambda_coll, self.enemy_hand_walls_segments)
                 self_prev_hand_pos = (1-lambda_coll)*self_prev_hand_pos + lambda_coll*self_new_hand_pos
                 prev_ball_pos = (1-lambda_coll)*prev_ball_pos + lambda_coll*new_ball_pos
             elif( coll_type == SELF_HAND_BALL_COLLISION ):
@@ -293,12 +308,14 @@ class air_hockey:
                 self_prev_hand_pos = (1-lambda_coll)*self_prev_hand_pos + lambda_coll*self_new_hand_pos
             elif( coll_type == GOAL_TO_SELF):
                 print( "OOOH!!, you have been scored a goal")
+                self_goals += 1;
                 (prev_ball_pos, new_ball_pos, self.ball_vel) = self.ball_wall_coll(prev_ball_pos, new_ball_pos,
                     self.array_to_vel(self.self_goal), lambda_coll, time_left, self.ball_vel)
                 self_prev_hand_pos = (1-lambda_coll)*self_prev_hand_pos + lambda_coll*self_new_hand_pos
                 enemy_prev_hand_pos = (1-lambda_coll)*enemy_prev_hand_pos + lambda_coll*enemy_new_hand_pos
             elif( coll_type == GOAL_TO_ENEMY):
                 print( "YEAAAH!!, you have scored a goal")
+                enemy_goals += 1
                 (prev_ball_pos, new_ball_pos, self.ball_vel) = self.ball_wall_coll(prev_ball_pos, new_ball_pos,
                     self.array_to_vel(self.enemy_goal), lambda_coll, time_left, self.ball_vel)
                 self_prev_hand_pos = (1-lambda_coll)*self_prev_hand_pos + lambda_coll*self_new_hand_pos
@@ -321,7 +338,7 @@ class air_hockey:
         self.ball_vel = self.friction_force( self.m_ball, self.ball_fric_coeff, self.ball_vel )
         self.self_hand_vel = self.friction_force( self.m_hand, self.hand_fric_coeff, self.self_hand_vel )
         self.enemy_hand_vel = self.friction_force( self.m_hand, self.hand_fric_coeff, self.enemy_hand_vel )
-
+        return( self_goals, enemy_goals )
     #
     # ball and physics
     #

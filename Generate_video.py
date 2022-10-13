@@ -10,15 +10,17 @@ def update_line(i, lin_ball, ball_contours, lin_self_hand, self_hand_contours, l
     lin_enemy_hand.set_data( [enemy_hand_contours[i,:,0], enemy_hand_contours[i,:,1]] )
     return lin_ball
 
-game = air_hockey( hand_fric_coeff = 0.1, ball_fric_coeff = 0.1 , bounce_coeff=0.97, dt = 1/30);
+game = air_hockey( x_width = 90, y_height=120, ball_radious=2.5, hand_radious=3, hand_fric_coeff = 0.1, ball_fric_coeff = 0.01 , bounce_coeff=0.97, dt = 1/60);
 
 self = game
 
 game._draw()
 theta = np.random.rand()*np.pi
-v_vel = (7+np.random.rand()*5)
+theta = 1.087182779223424
+theta = np.pi*3/2
+v_vel = (7+np.random.rand()*5)*50
 # theta = np.pi/3
-game.set_ball_pos_vel([game.x_width/2, game.y_height/2],  v_vel*np.array( [np.cos(theta), np.sin(theta)] ) )
+game.set_ball_pos_vel([game.x_width/2, game.y_height*0.9],  v_vel*np.array( [np.cos(theta), np.sin(theta)] ) )
 # game.set_ball_pos_vel([1,1],  [-1,-1] )
 
 
