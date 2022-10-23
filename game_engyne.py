@@ -1,9 +1,4 @@
-from cmath import sqrt
-from genericpath import exists
-from hashlib import new
-import re
-from shutil import which
-from tabnanny import check
+
 import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib.animation as animation
@@ -199,7 +194,7 @@ class air_hockey:
         # any_coll = np.any(total_bool); coll_type = NONE_COLL; lambda_coll = -1
         if( np.any(total_bool) ):       # there is some collision
             total_lambda = np.concatenate( ([l_self_hand], [l_enemy_hand], l_self_hand_wall, l_enemy_hand_wall, l_wall_coll) )
-            where_coll = np.where( total_bool )
+            where_coll = np.where( total_bool )[0]
             arg_min_i = np.argmin( total_lambda[total_bool] )
             which_coll = where_coll[arg_min_i]
             lambda_coll = total_lambda[which_coll]
@@ -339,6 +334,7 @@ class air_hockey:
         self.self_hand_vel = self.friction_force( self.m_hand, self.hand_fric_coeff, self.self_hand_vel )
         self.enemy_hand_vel = self.friction_force( self.m_hand, self.hand_fric_coeff, self.enemy_hand_vel )
         return( self_goals, enemy_goals )
+    
     #
     # ball and physics
     #
