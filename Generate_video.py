@@ -16,13 +16,11 @@ self = game
 
 game._draw()
 theta = np.random.rand()*np.pi
-theta = 1.087182779223424
-theta = np.pi*3/2
-v_vel = (7+np.random.rand()*5)*50
+v_vel = (7+np.random.rand()*5)*15
 # theta = np.pi/3
-game.set_ball_pos_vel([game.x_width/2, game.y_height*0.9],  v_vel*np.array( [np.cos(theta), np.sin(theta)] ) )
+game.set_ball_pos_vel([game.x_width/2, game.y_height*0.5],  v_vel*np.array( [np.cos(theta), np.sin(theta)] ) )
 # game.set_ball_pos_vel([1,1],  [-1,-1] )
-
+game.self_hand_vel = np.array( [0, 50] )
 
 lin_ball = game.ax.plot( game.ball_contour[:,0], game.ball_contour[:,1], '--r' )[0]
 lin_self_hand = game.ax.plot( game.self_hand_contour[:,0], game.self_hand_contour[:,1], '--b' )[0]
@@ -55,12 +53,12 @@ line_ani = animation.FuncAnimation( game.fig, update_line, n_loop,
 
 
 
-"""
+
 Writer = animation.writers['ffmpeg']
-writer = Writer(fps=10, metadata=dict(artist='Me'), bitrate=1800)
+writer = Writer(fps=int(1/game.dt), metadata=dict(artist='Me'), bitrate=1800)
 
-line_ani.save('corner.mp4', writer=writer)
+line_ani.save('random_2.gif', writer=writer)
 
-"""
+
 
 plt.show()

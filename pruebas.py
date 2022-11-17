@@ -7,8 +7,13 @@ print("hello")
 game = air_hockey(goal_fraction = 0.7);
 
 game._draw()
+lin_ball = game.ax.plot( game.ball_contour[:,0], game.ball_contour[:,1], '--r' )[0]
+lin_self_hand = game.ax.plot( game.self_hand_contour[:,0], game.self_hand_contour[:,1], '--b' )[0]
+lin_enemy_hand = game.ax.plot( game.enemy_hand_contour[:,0], game.enemy_hand_contour[:,1], '--b' )[0]
+
 plt.show()
 
+"""
 x_prev = [1, 1 ]
 x_next = [1, 1 ]
 
@@ -49,3 +54,4 @@ print("dist = ", np.linalg.norm(pos_ball-pos_hand) )
 print( pos_ball )
 print( pos_hand )
 
+"""

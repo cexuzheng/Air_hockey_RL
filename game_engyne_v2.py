@@ -9,6 +9,27 @@ soft_pink = (255/255,192/255,203/255)
 GOAL_TO_ENEMY = 1; GOAL_TO_SELF = 2; WALL_COLLISION = 3; SELF_HAND_BALL_COLLISION = 4; ENEMY_HAND_BALL_COLLSION = 5; NONE_COLL = -1
 SELF_HAND_WALL_COLLISION = 6; ENEMY_HAND_WALL_COLLISION = 7
 
+class disk_obj:
+    def __init__(self, walls, pos = [0,0], vel = [0,0], radious = 0.1, mass = 0.1, fric_coeff = 0.1, bounce_coeff = 0.96):
+        self.radious = radious;
+        self.walls = walls;
+        self.mass = mass;
+        self.fric_coeff = fric_coeff;
+        self.bounce_coeff = bounce_coeff;
+
+        points = np.linspace( 0, 2*np.pi, 100 )
+        self.pos = np.array(pos)
+        self.contour = radious*np.array( [  np.cos(points), np.sin(points) ] ).T + self.pos
+        self.contour_pos = self.pos
+        self.vel = np.array(vel);
+        
+        
+class rooms_v2( disk_obj ):
+    def __init__(self, walls, pos = [0,0], vel = [0,0], radious = 0.1, mass = 0.1, fric_coeff = 0.1, bounce_coeff = 0.96):
+        super().__init__(walls, pos, vel, radious, mass, fric_coeff, bounce_coeff)
+
+
+
 class air_hockey:
     def __init__(self, x_width = 4, y_height = 6, dt = 0.1, ball_radious = 0.1, hand_radious = 0.15,
             goal_fraction = 0.5, m_ball = 0.1, m_hand = 0.2, hand_fric_coeff = 0.1, ball_fric_coeff = 0.01,
@@ -17,17 +38,23 @@ class air_hockey:
         self.y_height = y_height;
         self.dt = dt;
 
-        points = np.linspace( 0, 2*np.pi, 100 )
-        self.ball_radious = ball_radious;
-        self.ball_pos = np.array(  [ ball_radious + np.random.rand()*( x_width - 2*ball_radious ), 
+        # def ball
+        ball_pos = np.array(  [ ball_radious + np.random.rand()*( x_width - 2*ball_radious ), 
                     ball_radious + np.random.rand()*( y_height - 2*ball_radious ) ]  );         # [x,y]
-        self.ball_contour = ball_radious*np.array( [  np.cos(points), np.sin(points) ] ).T + self.ball_pos
-        self.ball_contour_pos = self.ball_pos
         ball_v_angle = np.random.rand() * 2*np.pi 
-        self.ball_vel = np.random.rand()*np.array([ np.cos(ball_v_angle), np.sin(ball_v_angle) ])
+        ball_vel = np.random.rand()*np.array([ np.cos(ball_v_angle), np.sin(ball_v_angle) ])
+        
+        wall_segments = []  # [ [x1,y1], [x2,y2] ]
+        wall_segments = wall_segments + [[ [ball_radious,     ball_radious],                  [self.x_width*goal_corner, ball_radious]                   ]]
+        wall_segments = wall_segments + [[ [self.x_width*(1-goal_corner) ,ball_radious],      [x_width - ball_radious, ball_radious]                     ]]
+        wall_segments = wall_segments + [[ [x_width - ball_radious, ball_radious],            [x_width - ball_radious, y_height - ball_radious]          ]]
+        wall_segments = wall_segments + [[ [x_width - ball_radious, y_height - ball_radious], [self.x_width*(1-goal_corner) , y_height - ball_radious]   ]]
+        wall_segments = wall_segments + [[ [self.x_width*goal_corner,y_height-ball_radious],  [ball_radious, y_height-ball_radious]                      ]]
+        wall_segments = wall_segments + [[ [ball_radious, y_height-ball_radious],             [ball_radious, ball_radious]                               ]]
+        self.ball = disk_obj( wall_segments, ball_pos, ball_vel )
 
+        
         self.hand_radious = hand_radious;
-
         self.self_hand_pos = np.array(  [ x_width/2, hand_radious + y_height/2*0.3 ]  );         # [x,y]
         self.self_hand_contour = hand_radious*np.array( [  np.cos(points), np.sin(points) ] ).T + self.self_hand_pos
         self.self_hand_contour_pos = self.self_hand_pos
@@ -51,14 +78,6 @@ class air_hockey:
         self.bounce_coeff = bounce_coeff
 
         
-        wall_segments = []  # [ [x1,y1], [x2,y2] ]
-        wall_segments = wall_segments + [[ [ball_radious,     ball_radious],                  [self.x_width*goal_corner, ball_radious]                   ]]
-        wall_segments = wall_segments + [[ [self.x_width*(1-goal_corner) ,ball_radious],      [x_width - ball_radious, ball_radious]                     ]]
-        wall_segments = wall_segments + [[ [x_width - ball_radious, ball_radious],            [x_width - ball_radious, y_height - ball_radious]          ]]
-        wall_segments = wall_segments + [[ [x_width - ball_radious, y_height - ball_radious], [self.x_width*(1-goal_corner) , y_height - ball_radious]   ]]
-        wall_segments = wall_segments + [[ [self.x_width*goal_corner,y_height-ball_radious],  [ball_radious, y_height-ball_radious]                      ]]
-        wall_segments = wall_segments + [[ [ball_radious, y_height-ball_radious],             [ball_radious, ball_radious]                               ]]
-        self.ball_walls_segments =  wall_segments 
 
         hand_limits = []
         hand_limits = hand_limits + [[  [hand_radious, hand_radious], [self.x_width-hand_radious, hand_radious]     ]]
