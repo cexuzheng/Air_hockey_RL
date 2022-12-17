@@ -1,5 +1,6 @@
 import numpy as np
 from game_engyne import air_hockey
+from env_versions import env_v1
 import matplotlib.pyplot as plt
 
 print("hello")
@@ -11,7 +12,14 @@ lin_ball = game.ax.plot( game.ball_contour[:,0], game.ball_contour[:,1], '--r' )
 lin_self_hand = game.ax.plot( game.self_hand_contour[:,0], game.self_hand_contour[:,1], '--b' )[0]
 lin_enemy_hand = game.ax.plot( game.enemy_hand_contour[:,0], game.enemy_hand_contour[:,1], '--b' )[0]
 
-plt.show()
+# plt.show()
+
+env = env_v1()
+
+env.reset()
+
+print( env.step(1) )
+
 
 """
 x_prev = [1, 1 ]

@@ -22,9 +22,17 @@ class disk_obj:
         self.contour = radious*np.array( [  np.cos(points), np.sin(points) ] ).T + self.pos
         self.contour_pos = self.pos
         self.vel = np.array(vel);
-        
-        
-class rooms_v2( disk_obj ):
+    
+    def update_contour(self):
+        self.contour += self.pos - self.contour_pos
+        self.contour_pos = self.pos
+    
+    def set_pos_vel(self, pos, vel):
+        self.pos = np.array(pos); self.vel = np.array(vel)
+        self.contour += self.pos - self.contour_pos
+        self.contour_pos = pos
+
+class hand( disk_obj ):
     def __init__(self, walls, pos = [0,0], vel = [0,0], radious = 0.1, mass = 0.1, fric_coeff = 0.1, bounce_coeff = 0.96):
         super().__init__(walls, pos, vel, radious, mass, fric_coeff, bounce_coeff)
 
@@ -32,8 +40,7 @@ class rooms_v2( disk_obj ):
 
 class air_hockey:
     def __init__(self, x_width = 4, y_height = 6, dt = 0.1, ball_radious = 0.1, hand_radious = 0.15,
-            goal_fraction = 0.5, m_ball = 0.1, m_hand = 0.2, hand_fric_coeff = 0.1, ball_fric_coeff = 0.01,
-            bounce_coeff = 0.96):
+            goal_fraction = 0.5, m_ball = 0.1, m_hand = 0.2, ball_fric_coeff = 0.01, bounce_coeff = 0.96):
         self.x_width = x_width;
         self.y_height = y_height;
         self.dt = dt;
@@ -51,33 +58,7 @@ class air_hockey:
         wall_segments = wall_segments + [[ [x_width - ball_radious, y_height - ball_radious], [self.x_width*(1-goal_corner) , y_height - ball_radious]   ]]
         wall_segments = wall_segments + [[ [self.x_width*goal_corner,y_height-ball_radious],  [ball_radious, y_height-ball_radious]                      ]]
         wall_segments = wall_segments + [[ [ball_radious, y_height-ball_radious],             [ball_radious, ball_radious]                               ]]
-        self.ball = disk_obj( wall_segments, ball_pos, ball_vel )
-
-        
-        self.hand_radious = hand_radious;
-        self.self_hand_pos = np.array(  [ x_width/2, hand_radious + y_height/2*0.3 ]  );         # [x,y]
-        self.self_hand_contour = hand_radious*np.array( [  np.cos(points), np.sin(points) ] ).T + self.self_hand_pos
-        self.self_hand_contour_pos = self.self_hand_pos
-        self.self_hand_vel = np.zeros(2)
-
-        self.enemy_hand_pos = np.array(  [ x_width/2, y_height*0.85 - hand_radious ]  );         # [x,y]
-        self.enemy_hand_contour = hand_radious*np.array( [  np.cos(points), np.sin(points) ] ).T + self.enemy_hand_pos
-        self.enemy_hand_contour_pos = self.enemy_hand_pos
-        self.enemy_hand_vel = np.zeros(2)
-
-        goal_corner = (1-goal_fraction)/2
-        self.goal_corner = goal_corner
-        self.self_goal = [  [self.x_width*goal_corner, ball_radious], [self.x_width*(1-goal_corner), ball_radious]  ]
-        self.enemy_goal =[  [self.x_width*goal_corner, self.y_height - ball_radious], [self.x_width*(1-goal_corner), self.y_height - ball_radious]  ]
-
-        self.m_ball = m_ball
-        self.m_hand = m_hand
-
-        self.hand_fric_coeff = hand_fric_coeff
-        self.ball_fric_coeff = ball_fric_coeff
-        self.bounce_coeff = bounce_coeff
-
-        
+        self.ball = disk_obj( wall_segments, ball_pos, ball_vel, radious=ball_radious, mass=m_ball, fric_coeff=ball_fric_coeff, bounce_coeff=bounce_coeff )
 
         hand_limits = []
         hand_limits = hand_limits + [[  [hand_radious, hand_radious], [self.x_width-hand_radious, hand_radious]     ]]
@@ -85,6 +66,8 @@ class air_hockey:
         hand_limits = hand_limits + [[  [self.x_width-hand_radious, self.y_height/2-hand_radious], [hand_radious, self.y_height/2-hand_radious]     ]]
         hand_limits = hand_limits + [[  [hand_radious, self.y_height/2-hand_radious], [hand_radious, hand_radious]     ]]
         self.self_hand_walls_segments = hand_limits
+        self_hand_pos = np.array(  [ x_width/2, hand_radious + y_height/2*0.3 ]  );         # [x,y]
+        self.self_hand = hand( hand_limits, self_hand_pos, radious=hand_radious, mass=m_hand)
 
         hand_limits = []
         hand_limits = hand_limits + [[  [hand_radious, self.y_height/2+hand_radious], [self.x_width-hand_radious, self.y_height/2+hand_radious]     ]]
@@ -92,19 +75,23 @@ class air_hockey:
         hand_limits = hand_limits + [[  [self.x_width-hand_radious, self.y_height-hand_radious], [hand_radious, self.y_height-hand_radious]     ]]
         hand_limits = hand_limits + [[  [hand_radious, self.y_height-hand_radious], [hand_radious, self.y_height/2+hand_radious]     ]]
         self.enemy_hand_walls_segments = hand_limits
+        enemy_hand_pos = np.array(  [ x_width/2, y_height*0.85 - hand_radious ]  );         # [x,y]
+        self.enemy_hand = hand( hand_limits, enemy_hand_pos, radious=hand_radious, mass=m_hand)
 
+        goal_corner = (1-goal_fraction)/2
+        self.goal_corner = goal_corner
+        self.self_goal = [  [self.x_width*goal_corner, ball_radious], [self.x_width*(1-goal_corner), ball_radious]  ]
+        self.enemy_goal =[  [self.x_width*goal_corner, self.y_height - ball_radious], [self.x_width*(1-goal_corner), self.y_height - ball_radious]  ]
+        
     def update_contours(self):
-        self.ball_contour += self.ball_pos - self.ball_contour_pos
-        self.ball_contour_pos = self.ball_pos
-        self.self_hand_contour += self.self_hand_pos - self.self_hand_contour_pos
-        self.self_hand_contour_pos = self.self_hand_pos
-        self.enemy_hand_contour += self.enemy_hand_pos - self.enemy_hand_contour_pos
-        self.enemy_hand_contour_pos = self.enemy_hand_pos
+        self.ball.update_contour()
+        self.self_hand.update_contour()
+        self.enemy_hand.update_contour()
 
-    def set_ball_pos_vel(self, ball_pos, ball_vel):
-        self.ball_pos = np.array(ball_pos); self.ball_vel = np.array(ball_vel)
-        self.ball_contour += self.ball_pos - self.ball_contour_pos
-        self.ball_contour_pos = ball_pos
+    def set_pos_vel(self, ball_pos, ball_vel, obj = -1):
+        if obj == -1:
+            obj = self.ball
+        obj.set_pos_vel(ball_pos, ball_vel)
 
     def _draw(self):
         x_l2r = np.linspace(0, self.x_width, 11);
