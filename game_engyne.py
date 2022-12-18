@@ -278,7 +278,7 @@ class air_hockey:
         (any_coll, coll_type, lambda_coll, wall_i ) = self.check_any_coll([prev_ball_pos, new_ball_pos], 
                 [self_prev_hand_pos, self_new_hand_pos], [enemy_prev_hand_pos, enemy_new_hand_pos])
 
-        print("coll_type = ", coll_type, "wall_i = ", wall_i)
+        # print("coll_type = ", coll_type, "wall_i = ", wall_i)
         time_left = self.dt*(1-lambda_coll)
         self_goals = 0;
         enemy_goals = 0;
@@ -302,14 +302,14 @@ class air_hockey:
                     enemy_new_hand_pos, lambda_coll, time_left, self.ball_vel, self.enemy_hand_vel)
                 self_prev_hand_pos = (1-lambda_coll)*self_prev_hand_pos + lambda_coll*self_new_hand_pos
             elif( coll_type == GOAL_TO_SELF):
-                print( "OOOH!!, you have been scored a goal")
+                # print( "OOOH!!, you have been scored a goal")
                 self_goals += 1;
                 (prev_ball_pos, new_ball_pos, self.ball_vel) = self.ball_wall_coll(prev_ball_pos, new_ball_pos,
                     self.array_to_vel(self.self_goal), lambda_coll, time_left, self.ball_vel)
                 self_prev_hand_pos = (1-lambda_coll)*self_prev_hand_pos + lambda_coll*self_new_hand_pos
                 enemy_prev_hand_pos = (1-lambda_coll)*enemy_prev_hand_pos + lambda_coll*enemy_new_hand_pos
             elif( coll_type == GOAL_TO_ENEMY):
-                print( "YEAAAH!!, you have scored a goal")
+                # print( "YEAAAH!!, you have scored a goal")
                 enemy_goals += 1
                 (prev_ball_pos, new_ball_pos, self.ball_vel) = self.ball_wall_coll(prev_ball_pos, new_ball_pos,
                     self.array_to_vel(self.enemy_goal), lambda_coll, time_left, self.ball_vel)

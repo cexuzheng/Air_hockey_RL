@@ -56,12 +56,12 @@ from torch.autograd import Variable
 import random
 
 class DQN(nn.Module):
-    def __init__(self, n_actions = 17, input_size = 6):
+    def __init__(self, n_actions = 17, input_size = 6, nlayer1 = 256, nlayer2 = 256 ):
         super(DQN, self).__init__()
         self.device = torch.device("cpu")
-        self.linear1 = nn.Linear(input_size, 50, device=self.device)
-        self.linear2 = nn.Linear(50, 50, device=self.device)
-        self.linear3 = nn.Linear(50, n_actions, device=self.device)
+        self.linear1 = nn.Linear(input_size, nlayer1, device=self.device)
+        self.linear2 = nn.Linear(nlayer1, nlayer2, device=self.device)
+        self.linear3 = nn.Linear(nlayer2, n_actions, device=self.device)
 
     def forward(self, input):
         # the input is expected as (N, n_input)
@@ -80,19 +80,22 @@ class DQN(nn.Module):
       
 
 class RL_Agent_v1(nn.Module):
-    def __init__(self, n_actions = 17, input_size = 6, learning_rate=1e-3, batch_size = 128, gamma = 1-1e-2):
+    def __init__(self, n_actions = 17, input_size = 6, learning_rate=1e-3, batch_size = 128, 
+                gamma = 1-1e-2, nlayer1 = 256, nlayer2 = 256, memory_capacity = 10000 ):
         super(RL_Agent_v1, self).__init__()
         self.device = torch.device("cpu")
         self.n_actions = n_actions
         self.gamma = gamma
 
-        self.agent = DQN(n_actions, input_size).to(self.device)
-        self.clipped = DQN(n_actions, input_size).to(self.device)
+        self.agent = DQN(n_actions, input_size, nlayer1, nlayer2).to(self.device)
+        self.clipped = DQN(n_actions, input_size, nlayer1, nlayer2).to(self.device)
         self.clipped.load_state_dict( self.agent.state_dict() )
         self.optimizer = optim.Adam(self.agent.parameters(), lr=learning_rate)
-        
+        self.criterion = nn.MSELoss(reduction='sum')
+
         self.batch_size = batch_size
-        self.memory = ReplayMemory()
+        self.memory_capacity = memory_capacity
+        self.memory = ReplayMemory(memory_capacity)
     
     def get_action(self, state, e_greedy = -1):
         if not torch.is_tensor( state ):
@@ -114,6 +117,12 @@ class RL_Agent_v1(nn.Module):
         self.agent.load_state_dict( torch.load(load_file) )
         self.clipped.load_state_dict( self.agent.state_dict() )
     
+    def save_memory(self, save_file):
+        write_list( self.memory, save_file )
+
+    def load_memory(self, load_file):
+        self.memory = read_list(load_file)
+
     def learn(self):
         transitions = self.memory.sample(self.batch_size)
         batch = Transition(*zip(*transitions))      # array of transitions -> transition of arrays
@@ -127,13 +136,13 @@ class RL_Agent_v1(nn.Module):
             next_state_values[ torch.logical_not( done_mask ) ] = self.clipped.forward( not_done_next_state ).max(1)[0].detach()
             expected_state_action_values = (next_state_values * self.gamma) + torch.tensor(batch.reward, device=self.device, requires_grad=False)
         
-        criterion = nn.MSELoss(reduction='sum')
-        loss = criterion(state_action_values, expected_state_action_values.unsqueeze(0))
+        loss = self.criterion(state_action_values, expected_state_action_values.unsqueeze(0))
         self.optimizer.zero_grad()
         loss.backward()
         for param in self.agent.parameters():       # clip the range of the gradients
             param.grad.data.clamp_(-100, 100)
         self.optimizer.step()
+        return loss.data
 
     def step(self, state, action, done, next_state, reward):
         self.memory.push( state, action, done, next_state, reward )

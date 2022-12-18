@@ -15,22 +15,30 @@ class env_v1():
         self.actions = np.concatenate( ([[0],[0]], self.actions), axis=1)
         self.draw_canvas()
 
-    def reset(self, ball_pos = None, ball_vel=None):
-        if(ball_pos == None):
+    def reset(self, ball_pos = None, ball_vel=None, self_pos = None, enemy_pos = None):
+        if(ball_pos is None):
             self.air_hockey.ball_pos = np.array( [self.x_width/2, self.y_heigth/2] )
         else:
             self.air_hockey.ball_pos = np.array(ball_pos)
 
-        if( ball_vel == None):
+        if( ball_vel is None):
             theta = (np.random.rand()-0.5)*2*np.pi
-            v = 5 + np.random.rand()*5
+            v = np.random.rand()*10
             self.air_hockey.ball_vel = v*np.array( [np.cos(theta), np.sin(theta)] )
         else:
             self.air_hockey.ball_vel = np.array(ball_vel)
         
-        self.air_hockey.self_hand_pos = self.init_pos
+        if(self_pos is None):
+            self.air_hockey.self_hand_pos = self.init_pos
+        else:
+            self.air_hockey.self_hand_pos = np.array(self_pos)
+
+        if(enemy_pos is None):
+            self.air_hockey.enemy_hand_pos = [self.x_width, self.y_heigth] - self.init_pos
+        else:
+            self.air_hockey.enemy_hand_pos = np.array(enemy_pos)
+
         self.air_hockey.self_hand_vel = np.zeros( 2 )
-        self.air_hockey.enemy_hand_pos = [self.x_width, self.y_heigth] - self.init_pos
         self.air_hockey.enemy_hand_vel = np.zeros( 2 )
 
 
