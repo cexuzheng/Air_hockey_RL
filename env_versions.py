@@ -8,6 +8,7 @@ class env_v1():
         self.air_hockey = air_hockey(x_width=x_width, y_height=y_heigth, dt=dt)
         self.x_width = x_width
         self.y_heigth = y_heigth
+        self.goal_corner = self.air_hockey.goal_corner
         self.init_pos = np.array( [x_width/2, y_heigth/5] )
         self.dt = self.air_hockey.dt
         thetas = np.linspace( 0, np.pi/(n_actions-1)*(n_actions-2), n_actions )
@@ -62,14 +63,22 @@ class env_v1():
         self.y_pixels = self.y_heigth*ppm
         self.canvas = np.ones( (self.x_pixels, self.y_pixels, 3), 'uint8')*255
         rr,cc = line( 0,0, self.x_pixels-1, 0 )
-        self.canvas[rr,cc,:] = (0,0,0)
+        self.canvas[rr,cc,:] = (0,0,255)
         rr,cc = line( 0,0, 0,self.y_pixels-1)
-        self.canvas[rr,cc,:] = (0,0,0)
+        self.canvas[rr,cc,:] = (0,0,255)
         rr,cc = line( self.x_pixels-1,0, self.x_pixels-1,self.y_pixels-1)
-        self.canvas[rr,cc,:] = (0,0,0)
+        self.canvas[rr,cc,:] = (0,0,255)
         rr,cc = line( 0,self.y_pixels-1, self.x_pixels-1,self.y_pixels-1)
-        self.canvas[rr,cc,:] = (0,0,0)
+        self.canvas[rr,cc,:] = (0,0,255)
         rr,cc = line(0, int(self.y_pixels/2), self.x_pixels-1, int(self.y_pixels/2) )
+        self.canvas[rr,cc,:] = (255,0,0)
+        for i in range(5):
+            rr,cc = line(int(self.x_pixels*self.goal_corner), i, int(self.x_pixels*(1-self.goal_corner))-1, i )
+            self.canvas[rr,cc,:] = (0,0,0)
+        for i in range(5):
+            rr,cc = line(int(self.x_pixels*self.goal_corner), self.y_pixels-i-1, int(self.x_pixels*(1-self.goal_corner))-1, self.y_pixels-i-1 )
+            self.canvas[rr,cc,:] = (0,0,0)
+
         self.ball_px_rad = self.air_hockey.ball_radious*ppm
         self.hand_px_rad = self.air_hockey.hand_radious*ppm
 
@@ -94,4 +103,32 @@ class env_v1():
         return drawing
 
 
+class env_v2(env_v1):
+    def __init__(self, x_width = 4, y_heigth = 6, n_actions = 17, hand_v = 1, dt = 0.1, dist_exp = 1, dist_max = 10):
+        super().__init__( x_width, y_heigth, n_actions, hand_v, dt )
+        if dist_exp > 0:
+            dist_exp = -dist_exp
+        self.dist_exp = dist_exp
+
+        if dist_max < 0:
+            dist_max = -dist_max
+        
+        self.dist_max = dist_max
+    
+    def step(self, n_action):
+        reward = 0; done = False; info = ()
+        self.air_hockey.self_hand_vel = self.actions[:,n_action]
+        self_goal, enemy_goal = self.air_hockey.compute_physics()
+        new_state = np.concatenate( (self.air_hockey.ball_pos, self.air_hockey.ball_vel, self.air_hockey.self_hand_pos)  )
+        if( self.air_hockey.ball_pos[1] < self.y_heigth/2 ):
+            reward -= 1
+        else:
+            reward += 1
+        
+        dist_reward = self.dist_max* np.exp( self.dist_exp*np.linalg.norm( self.air_hockey.ball_pos-self.air_hockey.self_hand_pos )   )
+        
+        reward += enemy_goal*1000 - self_goal*1000 + dist_reward
+
+        return(new_state, reward, done, info)
+    
 

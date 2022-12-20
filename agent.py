@@ -56,17 +56,18 @@ from torch.autograd import Variable
 import random
 
 class DQN(nn.Module):
-    def __init__(self, n_actions = 17, input_size = 6, nlayer1 = 256, nlayer2 = 256 ):
+    def __init__(self, n_actions = 17, input_size = 6, nlayer1 = 256, nlayer2 = 256, dtype = torch.float32 ):
         super(DQN, self).__init__()
         self.device = torch.device("cpu")
-        self.linear1 = nn.Linear(input_size, nlayer1, device=self.device)
-        self.linear2 = nn.Linear(nlayer1, nlayer2, device=self.device)
-        self.linear3 = nn.Linear(nlayer2, n_actions, device=self.device)
+        self.dtype = dtype
+        self.linear1 = nn.Linear(input_size, nlayer1, device=self.device, dtype=self.dtype)
+        self.linear2 = nn.Linear(nlayer1, nlayer2, device=self.device, dtype=self.dtype)
+        self.linear3 = nn.Linear(nlayer2, n_actions, device=self.device, dtype=self.dtype)
 
     def forward(self, input):
         # the input is expected as (N, n_input)
         if not torch.is_tensor( input ):
-            input = torch.tensor( input, dtype=torch.float32, device=self.device )
+            input = torch.tensor( input, dtype=self.dtype, device=self.device )
 
         if  isinstance(input, list) or isinstance(input, tuple):
             input = torch.stack( input )
@@ -81,14 +82,15 @@ class DQN(nn.Module):
 
 class RL_Agent_v1(nn.Module):
     def __init__(self, n_actions = 17, input_size = 6, learning_rate=1e-3, batch_size = 128, 
-                gamma = 1-1e-2, nlayer1 = 256, nlayer2 = 256, memory_capacity = 10000 ):
+                gamma = 1-1e-2, nlayer1 = 256, nlayer2 = 256, memory_capacity = 10000, dtype = torch.float32 ):
         super(RL_Agent_v1, self).__init__()
         self.device = torch.device("cpu")
         self.n_actions = n_actions
         self.gamma = gamma
-
-        self.agent = DQN(n_actions, input_size, nlayer1, nlayer2).to(self.device)
-        self.clipped = DQN(n_actions, input_size, nlayer1, nlayer2).to(self.device)
+        
+        self.dtype = dtype
+        self.agent = DQN(n_actions, input_size, nlayer1, nlayer2, self.dtype).to(self.device)
+        self.clipped = DQN(n_actions, input_size, nlayer1, nlayer2, self.dtype).to(self.device)
         self.clipped.load_state_dict( self.agent.state_dict() )
         self.optimizer = optim.Adam(self.agent.parameters(), lr=learning_rate)
         self.criterion = nn.MSELoss(reduction='sum')
@@ -126,15 +128,15 @@ class RL_Agent_v1(nn.Module):
     def learn(self):
         transitions = self.memory.sample(self.batch_size)
         batch = Transition(*zip(*transitions))      # array of transitions -> transition of arrays
-        states_batch = torch.tensor( np.array(batch.state), dtype=torch.float32, device=self.device, requires_grad=False )
+        states_batch = torch.tensor( np.array(batch.state), dtype=self.dtype, device=self.device, requires_grad=False )
         done_mask = torch.tensor(batch.done, requires_grad=False)
         state_action_values = self.agent.forward( states_batch ).gather(1, torch.tensor( [batch.action], device=self.device, requires_grad=False) )
         not_done_next_state = torch.tensor(  np.array([ batch.next_state[i] for i in range(self.batch_size) if not done_mask[i] ]), dtype=torch.float32, device=self.device, requires_grad=False )
     
         with torch.no_grad():
-            next_state_values = torch.zeros( self.batch_size, device = self.device, requires_grad=False )
+            next_state_values = torch.zeros( self.batch_size, device = self.device, requires_grad=False, dtype=self.dtype )
             next_state_values[ torch.logical_not( done_mask ) ] = self.clipped.forward( not_done_next_state ).max(1)[0].detach()
-            expected_state_action_values = (next_state_values * self.gamma) + torch.tensor(batch.reward, device=self.device, requires_grad=False)
+            expected_state_action_values = (next_state_values * self.gamma) + torch.tensor(batch.reward, device=self.device, requires_grad=False, dtype=self.dtype)
         
         loss = self.criterion(state_action_values, expected_state_action_values.unsqueeze(0))
         self.optimizer.zero_grad()
