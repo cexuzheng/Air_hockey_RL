@@ -282,6 +282,7 @@ class air_hockey:
         time_left = self.dt*(1-lambda_coll)
         self_goals = 0;
         enemy_goals = 0;
+        ball_colls = 0;
         while any_coll:
             if( coll_type == SELF_HAND_WALL_COLLISION ):
                 ( self_prev_hand_pos, self_new_hand_pos, self.self_hand_vel) = self.hand_wall_coll(self_prev_hand_pos, self_new_hand_pos, lambda_coll, self.self_hand_walls_segments)
@@ -292,6 +293,7 @@ class air_hockey:
                 self_prev_hand_pos = (1-lambda_coll)*self_prev_hand_pos + lambda_coll*self_new_hand_pos
                 prev_ball_pos = (1-lambda_coll)*prev_ball_pos + lambda_coll*new_ball_pos
             elif( coll_type == SELF_HAND_BALL_COLLISION ):
+                ball_colls += 1
                 ( prev_ball_pos, new_ball_pos, self_prev_hand_pos, self_new_hand_pos, self.ball_vel, 
                     self.self_hand_vel ) = self.hand_ball_coll(prev_ball_pos, new_ball_pos, self_prev_hand_pos,
                     self_new_hand_pos, lambda_coll, time_left, self.ball_vel, self.self_hand_vel)
@@ -333,7 +335,7 @@ class air_hockey:
         self.ball_vel = self.friction_force( self.m_ball, self.ball_fric_coeff, self.ball_vel )
         self.self_hand_vel = self.friction_force( self.m_hand, self.hand_fric_coeff, self.self_hand_vel )
         self.enemy_hand_vel = self.friction_force( self.m_hand, self.hand_fric_coeff, self.enemy_hand_vel )
-        return( self_goals, enemy_goals )
+        return( self_goals, enemy_goals, ball_colls )
     
     #
     # ball and physics

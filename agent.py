@@ -81,7 +81,7 @@ class DQN(nn.Module):
       
 
 class RL_Agent_v1(nn.Module):
-    def __init__(self, n_actions = 17, input_size = 6, learning_rate=1e-3, batch_size = 128, 
+    def __init__(self, n_actions = 17, input_size = 6, learning_rate=1e-3, batch_size = 128, tau = 1e-2,
                 gamma = 1-1e-2, nlayer1 = 256, nlayer2 = 256, memory_capacity = 10000, dtype = torch.float32 ):
         super(RL_Agent_v1, self).__init__()
         self.device = torch.device("cpu")
@@ -93,12 +93,16 @@ class RL_Agent_v1(nn.Module):
         self.clipped = DQN(n_actions, input_size, nlayer1, nlayer2, self.dtype).to(self.device)
         self.clipped.load_state_dict( self.agent.state_dict() )
         self.optimizer = optim.Adam(self.agent.parameters(), lr=learning_rate)
-        self.criterion = nn.MSELoss(reduction='sum')
+        self.criterion = nn.SmoothL1Loss(reduction='mean')
 
         self.batch_size = batch_size
         self.memory_capacity = memory_capacity
         self.memory = ReplayMemory(memory_capacity)
-    
+
+        self.tau = tau
+        self.loss_array = []
+        self.soft_update(self.agent, self.clipped, 1.) 
+
     def get_action(self, state, e_greedy = -1):
         if not torch.is_tensor( state ):
             state = torch.tensor( state, dtype=torch.float32, device=self.device )
@@ -125,16 +129,18 @@ class RL_Agent_v1(nn.Module):
     def load_memory(self, load_file):
         self.memory = read_list(load_file)
 
-    def learn(self):
-        transitions = self.memory.sample(self.batch_size)
+    def learn(self, batch_size = None):
+        if ( batch_size == None ):
+            batch_size = self.batch_size
+        transitions = self.memory.sample(batch_size)
         batch = Transition(*zip(*transitions))      # array of transitions -> transition of arrays
         states_batch = torch.tensor( np.array(batch.state), dtype=self.dtype, device=self.device, requires_grad=False )
         done_mask = torch.tensor(batch.done, requires_grad=False)
         state_action_values = self.agent.forward( states_batch ).gather(1, torch.tensor( [batch.action], device=self.device, requires_grad=False) )
-        not_done_next_state = torch.tensor(  np.array([ batch.next_state[i] for i in range(self.batch_size) if not done_mask[i] ]), dtype=torch.float32, device=self.device, requires_grad=False )
+        not_done_next_state = torch.tensor(  np.array([ batch.next_state[i] for i in range(batch_size) if not done_mask[i] ]), dtype=torch.float32, device=self.device, requires_grad=False )
     
         with torch.no_grad():
-            next_state_values = torch.zeros( self.batch_size, device = self.device, requires_grad=False, dtype=self.dtype )
+            next_state_values = torch.zeros( batch_size, device = self.device, requires_grad=False, dtype=self.dtype )
             next_state_values[ torch.logical_not( done_mask ) ] = self.clipped.forward( not_done_next_state ).max(1)[0].detach()
             expected_state_action_values = (next_state_values * self.gamma) + torch.tensor(batch.reward, device=self.device, requires_grad=False, dtype=self.dtype)
         
@@ -144,7 +150,13 @@ class RL_Agent_v1(nn.Module):
         for param in self.agent.parameters():       # clip the range of the gradients
             param.grad.data.clamp_(-100, 100)
         self.optimizer.step()
+        self.loss_array.append( loss.data )
+        self.soft_update(self.agent, self.clipped, self.tau) 
         return loss.data
+
+    def soft_update(self, regular_model, target_model, tau):
+        for target_param, regular_param in zip(target_model.parameters(), regular_model.parameters()):
+            target_param.data.copy_(tau*regular_param.data + (1.0-tau)*target_param.data)
 
     def step(self, state, action, done, next_state, reward):
         self.memory.push( state, action, done, next_state, reward )
