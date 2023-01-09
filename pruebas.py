@@ -1,65 +1,79 @@
 import numpy as np
-from game_engyne import air_hockey
-from env_versions import env_v1
+from agent import RL_Agent_v1
+from env_versions import env_v4
 import matplotlib.pyplot as plt
-
-print("hello")
-
-game = air_hockey(goal_fraction = 0.7);
-
-game._draw()
-lin_ball = game.ax.plot( game.ball_contour[:,0], game.ball_contour[:,1], '--r' )[0]
-lin_self_hand = game.ax.plot( game.self_hand_contour[:,0], game.self_hand_contour[:,1], '--b' )[0]
-lin_enemy_hand = game.ax.plot( game.enemy_hand_contour[:,0], game.enemy_hand_contour[:,1], '--b' )[0]
-
-# plt.show()
-
-env = env_v1()
-
-env.reset()
-
-print( env.step(1) )
+import torch
+import time
+import sys
+from tqdm.notebook import tqdm
 
 
-"""
-x_prev = [1, 1 ]
-x_next = [1, 1 ]
+def train_v1(env, agent, max_episode_num = 5000, max_steps = 99, save_file = "RL_agent", mean_n = 10,
+             e_greedy = -1, e_max = 1, e_min = 0.5, e_decay_rate = 0.01, clip_update = 10, show_every = 10, save_every = 10):
+    start_time = time.time()
+    all_rewards = []
+    mean_rewards = []
+    # optimizer = optim.RMSprop(agent.parameters())
+    for episode in range(max_episode_num):
+        env.reset()
+        rewards = []
+        state = np.concatenate( (env.air_hockey.ball_pos, env.air_hockey.ball_vel, env.air_hockey.self_hand_pos)  )
+        if(e_greedy != -1):
+            e_greedy = e_min + (e_max - e_min)*np.exp(-e_decay_rate*episode)
 
-print( game.ball_walls_segments )
+        for steps in range(max_steps):
+            action = agent.get_action(state, e_greedy)
+            new_state, reward, done, _ = env.step(action)
+            rewards.append(reward)
+            agent.step( state, action, done, new_state, reward )
+            if done:
+                break
+            state = new_state
+        all_rewards.append(np.sum(rewards))
+        mean_rewards.append( np.mean(all_rewards[-mean_n:]) )
+        if (episode+1) % show_every == 0:
+            sys.stdout.write("episode: {}, total reward: {}, last_average_reward: {}, time: {}\n".format(episode, np.round(np.sum(rewards), decimals = 3),  
+                    np.round(np.mean(all_rewards[-mean_n:]), decimals = 3), time.time()-start_time))
+            
+        if ( episode+1 ) % save_every == 0:        # update the clipped
+            agent.save_model(save_file)
 
 
-(bools, lambdas) = game.check_wall_collision([x_prev, x_next], game.ball_walls_segments )
+    plt.figure()
+    plt.subplot(111)
+    plt.plot(all_rewards,'b')
+    plt.plot(mean_rewards,'r')
+    plt.xlabel('Episode')
+    plt.ylabel('Rewards')
+    plt.show()
+    return (all_rewards, mean_rewards)
 
-print (bools)
-print(lambdas)
-i = np.argmin( lambdas )
+def compute_colision(v_ball, p_ball, p_hand):
+    v_perp = np.array([1,0])
+    Lamb = np.dot(v_perp, v_ball)
+    pc = p_ball + v_ball*Lamb
+    return pc
 
-print( i )
+def clip_function(curr_states, rewards, next_states, actions):
+    curr_states = np.array(curr_states)
+    rewards = np.array(rewards)
+    next_states = np.array(next_states)
+    actions = np.array( actions )
+    batch_size = rewards.shape[0]
+    expected_value = np.zeros( batch_size )
+    p_hand = curr_states[:,4:6]
+    pc = compute_colision( curr_states[:,2:4], curr_states[:,0:2], p_hand )
+    ac_1 = pc[:,0] < p_hand[:,0]; ac_0 = pc[:,0] > p_hand[:,0]
+    expected_value[ (ac_1 and actions(ac_1) == 1) or (ac_0 and actions(ac_0) == 0)   ] = 50
+    expected_value[ (ac_1 and actions(ac_1) == 0) or (ac_0 and actions(ac_0) == 1)   ] = -50
+    return expected_value
+        
 
-ball_tr = [ [0.1, 1],[0.9, 1]  ]
-hand_tr = [ [0.9, 1],[0.1, 1]  ]
-
-ball_tr = [ [0.1, 1],[0.8, 1]  ]
-hand_tr = [ [0.9, 1],[0.9, 1]  ]
-
-ball_tr = [ [1, 2],[1, 1.5]  ]
-hand_tr = [ [0.1, 1],[0.9, 1]  ]
-
-print(game.hand_radious + game.ball_radious)
-
-hand_tr = np.array(hand_tr); ball_tr = np.array(ball_tr)
-v1 = ball_tr[1,:] - ball_tr[0,:]
-v2 = hand_tr[1,:] - hand_tr[0,:]
-(coll_bool, coll_lambda) = game.check_hand_collision( ball_tr, hand_tr)
-
-print(coll_bool)
-print(coll_lambda)
-
-pos_ball = ball_tr[0,:] + coll_lambda*v1
-pos_hand = hand_tr[0,:] + coll_lambda*v2
-
-print("dist = ", np.linalg.norm(pos_ball-pos_hand) )
-print( pos_ball )
-print( pos_hand )
-
-"""
+env = env_v4()
+agent = RL_Agent_v1(memory_capacity=1000, learning_rate=3e-2, batch_size=4, n_actions = 3, nlayer1=64, nlayer2=64, gamma=0.7)
+print( agent.agent.forward( [2,3,0,0,2,1] ) )
+agent.function = clip_function
+agent.learn_mode = 'function'
+(all_rewards, mean_rewards) = train_v1(env, agent, max_episode_num = 10, max_steps = 40, save_file = "post_training_DQN_5", mean_n=50,
+            e_greedy = 1, e_max = 1, e_min = 0.01, e_decay_rate = 0.001, show_every = 250, save_every = 500)
+print( agent.agent.forward( [2,3,0,0,2,1] ) )

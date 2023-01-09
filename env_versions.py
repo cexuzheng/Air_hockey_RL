@@ -185,3 +185,54 @@ class env_v3(env_v1):
         # dist_reward = self.dist_max* np.exp( self.dist_exp*np.linalg.norm( self.air_hockey.ball_pos-self.air_hockey.self_hand_pos )   )
         reward += ball_colls*5
         return(new_state, reward, done, info)
+
+
+
+
+
+class env_v4(env_v1):
+    def __init__(self, x_width = 4, y_heigth = 6, n_actions = 3, hand_v = 1, dt = 0.1, dist_exp = 1, dist_max = 10):
+        super().__init__( x_width, y_heigth, n_actions, hand_v, dt )
+        self.actions = np.array( [[1,0], [-1,0], [0,0]], dtype=np.float32 ).T
+        self.init_pos = np.array( [x_width/2, 2*y_heigth/5] )
+
+    def reset(self, ball_pos = None, ball_vel=None, self_pos = None, enemy_pos = None):
+        if(ball_pos is None):
+            self.air_hockey.ball_pos = np.array( [self.x_width/2, self.y_heigth/2] )
+        else:
+            self.air_hockey.ball_pos = np.array(ball_pos)
+
+        if( ball_vel is None):
+            theta = np.random.rand()*np.pi + np.pi
+            v = np.random.rand()*0.8 + 0.4 
+            self.air_hockey.ball_vel = v*np.array( [np.cos(theta), np.sin(theta)] )
+        else:
+            self.air_hockey.ball_vel = np.array(ball_vel)
+        
+        if(self_pos is None):
+            self.air_hockey.self_hand_pos = self.init_pos
+        else:
+            self.air_hockey.self_hand_pos = np.array(self_pos)
+
+        if(enemy_pos is None):
+            self.air_hockey.enemy_hand_pos = [self.x_width, self.y_heigth] - self.init_pos
+        else:
+            self.air_hockey.enemy_hand_pos = np.array(enemy_pos)
+
+        self.air_hockey.self_hand_vel = np.zeros( 2 )
+        self.air_hockey.enemy_hand_vel = np.zeros( 2 )
+
+    def step(self, n_action):
+        reward = 0; done = False; info = ()
+        self.air_hockey.self_hand_vel = self.actions[:,n_action]
+        out_ = self.air_hockey.compute_physics()
+        ball_colls = out_[2];
+        new_state = np.concatenate( (self.air_hockey.ball_pos, self.air_hockey.ball_vel, self.air_hockey.self_hand_pos)  )
+        if( self.air_hockey.ball_pos[1] > self.air_hockey.self_hand_pos[1] ):
+            reward += 1
+        else:
+            reward -= 1
+        if self.air_hockey.ball_pos[1] < self.air_hockey.self_hand_pos[1]:
+            reward -= 10
+        reward += ball_colls*5
+        return(new_state, reward, done, info)
