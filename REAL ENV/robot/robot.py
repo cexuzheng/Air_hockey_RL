@@ -1,7 +1,10 @@
 # Importing Libraries
 import serial
 import time
-arduino = serial.Serial(port='/dev/ttyUSB1', baudrate=2000000, timeout=.1)
+import json
+
+
+arduino = serial.Serial(port='/dev/ttyUSB0', baudrate=2000000, timeout=.1)
 
 def read_arduino():
     data = arduino.readline()
@@ -12,7 +15,24 @@ def write_arduino(x):
     time.sleep(0.01)
     
 while True:
-    #write_arduino("state")
-    write_arduino("{\"x\":0.15, \"y\":-0.15 }")
+    write_arduino("{\"x\":0.22, \"y\":0.50 }")
+    time.sleep(0.05)
+    write_arduino("state")
+
+    #value = read_arduino()
+    #time.sleep(0.05)
+    #print(value) # printing the value
+    
     value = read_arduino()
-    print(value) # printing the value
+    json_is_valid=True
+    try:
+        data = json.loads(value)
+    except ValueError as e:
+        json_is_valid = False  
+    time.sleep(0.05)
+    
+    if(json_is_valid):
+        print("x: ", data["x"]) 
+        print("y: ", data["y"]) 
+        print()
+    

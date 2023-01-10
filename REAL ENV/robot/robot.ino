@@ -19,12 +19,19 @@ const int SERVO_FREQ = 50;        // Servo frequency
 // ROBOT DATA
 const uint8_t SERVO_q1 = 0;       // Q1 servo channel
 const uint8_t SERVO_q2 = 1;       // Q2 servo channel
-const float a1 = 0.2;             // Shoulder link length
-const float a2 = 0.2;             // Elbow link length
-const float MIN_LIM_q1 =  MIN_ANGL; // Physical limits
+const float a1 = 0.17;              // Shoulder link length
+const float a2 = 0.246;             // Elbow link length
+const float MIN_LIM_q1 =  -2.03; // Physical limits
 const float MAX_LIM_q1 =  MAX_ANGL; // Physical limits
 const float MIN_LIM_q2 =  MIN_ANGL; // Physical limits
 const float MAX_LIM_q2 =  MAX_ANGL; // Physical limits
+
+// BOARD DATA
+const float MIN_LIM_x =  0.03; // Physical limits
+const float MAX_LIM_x =  0.40; // Physical limits
+const float MIN_LIM_y = -0.24; // Physical limits
+const float MAX_LIM_y =  0.24; // Physical limits
+
 
 //GLOBAL VARIABLES
 float real_x, real_y, real_q1, real_q2; //REAL ROBOT STATE
@@ -38,8 +45,13 @@ float mapfloat(float x, float in_min, float in_max, float out_min, float out_max
 
 
 int angle2microsec(float angle){
+  return mapfloat(angle, MIN_ANGL, MAX_ANGL, USMIN, USMAX); // Regla de la mano derecha
+}
+
+int angle2microsec_q2(float angle){
   return mapfloat(angle, MIN_ANGL, MAX_ANGL, USMAX, USMIN); // Regla de la mano derecha
 }
+
 
 bool inverseKinematics2DOF(float x, float y, float &q1, float &q2){
 
@@ -47,11 +59,12 @@ bool inverseKinematics2DOF(float x, float y, float &q1, float &q2){
   q2 = acos( (pow(x,2) + pow(y,2) - pow(a1,2) - pow(a2,2))/(2*a1*a2) );
   q1 = atan2(y,x) - atan2( (a2*sin(q2)), (a1 + a2*cos(q2)) );
 
-  if( (q1>MIN_LIM_q1 and q1<MAX_LIM_q1 and q2>MIN_LIM_q2 and q2<MAX_LIM_q2) == false ){
+  /*if( (q1>MIN_LIM_q1 and q1<MAX_LIM_q1 and q2>MIN_LIM_q2 and q2<MAX_LIM_q2) == false ){
     q2 = -acos( (pow(x,2) + pow(y,2) - pow(a1,2) - pow(a2,2))/(2*a1*a2) );
-    q1 = atan2(y,x) + atan2( (a2*sin(q2)), (a1 + a2*cos(q2)) );
-  }
-    return (q1>MIN_LIM_q1 and q1<MAX_LIM_q1 and q2>MIN_LIM_q2 and q2<MAX_LIM_q2);
+    q1 = atan2(y,x) + atan2( (a2*sin(q2)), (a1 + a2*cos(q2)) );*/
+  
+  return (q1>MIN_LIM_q1 and q1<MAX_LIM_q1 and q2>MIN_LIM_q2 and q2<MAX_LIM_q2) 
+         and (x>MIN_LIM_x and x<MAX_LIM_x and y>MIN_LIM_y and y<MAX_LIM_y);
 }
 
 
@@ -72,18 +85,16 @@ void setup() {
   delay(10);
 
 
-  //Move the robot to known position
-  real_x=0.2;
-  real_y=0.2;
+  //Move the robot to HOME position
+  real_x=0.21;
+  real_y=0.0;
   inverseKinematics2DOF(real_x, real_y, real_q1, real_q2);
   pwm.writeMicroseconds(SERVO_q1, angle2microsec(real_q1));  
-  pwm.writeMicroseconds(SERVO_q2, angle2microsec(real_q2));
+  pwm.writeMicroseconds(SERVO_q2, angle2microsec_q2(real_q2));
   delay(500);
-  //Serial.println("**********************");
-  //Serial.print(real_x);Serial.print("  ");Serial.println(real_y);
-  //Serial.print(real_q1);Serial.print("  ");Serial.println(real_q2);
-  //Serial.print(angle2microsec(real_q1));Serial.print("  ");Serial.println(angle2microsec(real_q2));
-  
+  Serial.print(real_x); Serial.print("   "); Serial.println(real_y); 
+  Serial.print(real_q1); Serial.print("   "); Serial.println(real_q2); 
+  delay(500);
 }
 
 
@@ -101,9 +112,9 @@ void loop() {
   Serial.println("**********************");
   Serial.print(real_x);Serial.print("  ");Serial.println(real_y);
   Serial.print(real_q1);Serial.print("  ");Serial.println(real_q2);
-  Serial.print(angle2microsec(real_q1));Serial.print("  ");Serial.println(angle2microsec(real_q2));
+  Serial.print(angle2microsec(real_q1));Serial.print("  ");Serial.println(angle2microsec_q2(real_q2));
   pwm.writeMicroseconds(SERVO_q1, angle2microsec(real_q1));  
-  pwm.writeMicroseconds(SERVO_q2, angle2microsec(real_q2));
+  pwm.writeMicroseconds(SERVO_q2, angle2microsec_q2(real_q2));
   delay(500);*/
   
   
@@ -111,7 +122,7 @@ void loop() {
     String input_msg = Serial.readString();
     
     if(input_msg =="state"){
-      String state_json = String("{\"x\":") + String(real_x) + String(", \"y\":") + String(real_y) + String("}");
+      String state_json = String("{\"x\":") + String(real_x,5) + String(", \"y\":") + String(real_y,5) + String("}");
       Serial.println(state_json);
     }else{
       float timer = millis();
@@ -121,11 +132,11 @@ void loop() {
         float next_q1, next_q2, next_x, next_y;
         next_x=doc["x"];
         next_y=doc["y"];
-        
+
         if(inverseKinematics2DOF(next_x, next_y, next_q1, next_q2)){
           int time_up_q1, time_up_q2;
           time_up_q1 = angle2microsec(next_q1);
-          time_up_q2 = angle2microsec(next_q2);
+          time_up_q2 = angle2microsec_q2(next_q2);
           pwm.writeMicroseconds(SERVO_q1, time_up_q1);  
           pwm.writeMicroseconds(SERVO_q2, time_up_q2);
       
