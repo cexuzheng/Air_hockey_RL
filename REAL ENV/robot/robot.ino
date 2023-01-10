@@ -133,7 +133,7 @@ void loop() {
         next_x=doc["x"];
         next_y=doc["y"];
 
-        if(inverseKinematics2DOF(next_x, next_y, next_q1, next_q2)){
+        if(inverseKinematics2DOF(next_x, next_y, next_q1, next_q2)and abs(next_q1-real_q1)<0.3 and abs(next_q2-real_q2)<0.3 ){
           int time_up_q1, time_up_q2;
           time_up_q1 = angle2microsec(next_q1);
           time_up_q2 = angle2microsec_q2(next_q2);
