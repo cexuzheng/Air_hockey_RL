@@ -37,5 +37,5 @@ void loop()
 
   pwm.writeMicroseconds(0, (1500.0));
   pwm.writeMicroseconds(1, (1500.0));                           // to maximum pulse length then to minimum pulse length.
-  delay(2000);
+  delay(40000);
 } 
