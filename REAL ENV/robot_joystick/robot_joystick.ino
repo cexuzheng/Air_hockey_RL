@@ -123,7 +123,7 @@ void loop() {
   next_y=real_y+yMap;
   
   
-  if(inverseKinematics2DOF(next_x, next_y, next_q1, next_q2)){
+  if(inverseKinematics2DOF(next_x, next_y, next_q1, next_q2) and abs(next_q1-real_q1)<0.3 and abs(next_q2-real_q2)<0.3 ){
     contador++;
     if(contador%100==0){
       Serial.println("********************************************");
