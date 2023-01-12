@@ -167,7 +167,7 @@ if __name__ == '__main__':
 	env = RealEnv(pixel_thrshold = 50, action_increment = 0.03, camera_num = 0, POS1_img_plane = (318,187), POS2_img_plane=(760,184))
 	agent = RL_Agent_v1(n_actions = 5, input_size = 3, learning_rate=1e-4, batch_size = 4, tau = 1e-4, learn_mode = 'clipped',
                 gamma = 1-1e-1, nlayer1 = 32, nlayer2 = 32, memory_capacity = 1000, dtype = torch.float32 ) 
-	train_v1(env, agent, max_episode_num = 100, max_steps = 1000, save_file = "RL_agent",
+	train_v1(env, agent, max_episode_num = 100, max_steps = 1000, save_file = "weights",
              e_greedy = 1, e_max = 1, e_min = 0.0005, e_decay_rate = 0.01, save_every = 5)
 	RealEnv.webcam.release() 
 	cv2.destroyAllWindows()
