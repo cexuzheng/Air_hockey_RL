@@ -4,14 +4,14 @@ from skimage.draw import disk, line
 
 
 class env_v1():
-    def __init__(self, x_width = 4, y_heigth = 6, n_actions = 17, hand_v = 1, dt = 0.1):
+    def __init__(self, x_width = 4, y_heigth = 6, n_actions = 16, hand_v = 1, dt = 0.1):
         self.air_hockey = air_hockey(x_width=x_width, y_height=y_heigth, dt=dt)
         self.x_width = x_width
         self.y_heigth = y_heigth
         self.goal_corner = self.air_hockey.goal_corner
         self.init_pos = np.array( [x_width/2, y_heigth/5] )
         self.dt = self.air_hockey.dt
-        thetas = np.linspace( 0, np.pi/(n_actions-1)*(n_actions-2), n_actions )
+        thetas = np.linspace( 0, 2*np.pi/(n_actions-1)*(n_actions-2), n_actions )
         self.actions = hand_v*np.array([np.cos(thetas), np.sin(thetas)])
         self.actions = np.concatenate( ([[0],[0]], self.actions), axis=1)
         self.draw_canvas()
@@ -187,11 +187,8 @@ class env_v3(env_v1):
         return(new_state, reward, done, info)
 
 
-
-
-
 class env_v4(env_v1):
-    def __init__(self, x_width = 4, y_heigth = 6, n_actions = 3, hand_v = 1, dt = 0.1, dist_exp = 1, dist_max = 10):
+    def __init__(self, x_width = 4, y_heigth = 6, n_actions = 3, hand_v = 1, dt = 0.1):
         super().__init__( x_width, y_heigth, n_actions, hand_v, dt )
         self.actions = np.array( [[1,0], [-1,0], [0,0]], dtype=np.float32 ).T
         self.init_pos = np.array( [x_width/2, 2*y_heigth/5] )
@@ -235,4 +232,54 @@ class env_v4(env_v1):
         if self.air_hockey.ball_pos[1] < self.air_hockey.self_hand_pos[1]:
             reward -= 10
         reward += ball_colls*5
+        return(new_state, reward, done, info)
+
+
+
+class env_v5(env_v1):
+    def __init__(self, x_width = 4, y_heigth = 6, n_actions = 17, hand_v = 1, dt = 0.1):
+        super().__init__( x_width, y_heigth, n_actions, hand_v, dt )
+        self.init_pos = np.array( [x_width/2, 2] )
+        self.reward_function = None
+
+    def reset(self, ball_pos = None, ball_vel=None, self_pos = None, enemy_pos = None):
+        if(ball_pos is None):
+            self.air_hockey.ball_pos = np.array( [self.x_width/2, self.y_heigth/2] )
+        else:
+            self.air_hockey.ball_pos = np.array(ball_pos)
+
+        if( ball_vel is None):
+            theta = np.random.rand()*np.pi/2 + np.pi*5/4
+            v = np.random.rand()*0.8 + 0.4 
+            self.air_hockey.ball_vel = v*np.array( [np.cos(theta), np.sin(theta)] )
+        else:
+            self.air_hockey.ball_vel = np.array(ball_vel)
+        
+        if(self_pos is None):
+            self.air_hockey.self_hand_pos = self.init_pos
+        else:
+            self.air_hockey.self_hand_pos = np.array(self_pos)
+
+        if(enemy_pos is None):
+            self.air_hockey.enemy_hand_pos = [self.x_width, self.y_heigth] - self.init_pos
+        else:
+            self.air_hockey.enemy_hand_pos = np.array(enemy_pos)
+
+        self.air_hockey.self_hand_vel = np.zeros( 2 )
+   
+    def step(self, n_action):
+        reward = 0; done = False; info = ()
+        new_state = np.concatenate( (self.air_hockey.ball_pos, self.air_hockey.ball_vel, self.air_hockey.self_hand_pos)  )
+        self.air_hockey.self_hand_vel = self.actions[:,n_action]
+        out_ = self.air_hockey.compute_physics()
+        ball_colls = out_[2];
+        new_state = np.concatenate( (self.air_hockey.ball_pos, self.air_hockey.ball_vel, self.air_hockey.self_hand_pos)  )
+        if( self.air_hockey.ball_pos[1] > self.y_heigth/2+1e-5 ):
+            reward += 1
+        else:
+            reward -= 1
+        # dist_reward = self.dist_max* np.exp( self.dist_exp*np.linalg.norm( self.air_hockey.ball_pos-self.air_hockey.self_hand_pos )   )
+        reward += ball_colls*5
+        reward += self.reward_function( self.actions[:,n_action], new_state, self.air_hockey)
+        # if( ball_colls or self.air_hockey.ball_vel[1] > 0 ): done = True
         return(new_state, reward, done, info)

@@ -134,7 +134,7 @@ class RL_Agent_v1(nn.Module):
     def load_memory(self, load_file):
         self.memory = read_list(load_file)
 
-    def learn(self, batch_size = None, function = None):
+    def learn(self, batch_size = None):
         if ( batch_size == None ):
             batch_size = self.batch_size
         transitions = self.memory.sample(batch_size)
